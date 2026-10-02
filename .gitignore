@@ -1,0 +1,34 @@
+# Local secrets and collected account data
+*.env
+.env
+.env.*
+!.env.example
+settings.json
+auth.json
+last_collection.json
+pending*.json
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*credential*
+*凭据*
+*密钥*
+# Python/build output
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.build-env/
+.build/
+.pytest_cache/
+*.spec
+build/
+dist/
+# Local/editor files
+work/
+.vscode/
+.idea/
+*.log
+Thumbs.db
+.DS_Store

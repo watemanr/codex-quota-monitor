@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Codex 额度历史与重置观察"><title>Codex 额度观察</title><link rel="icon" href="static/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="static/style.css?v=20260927-events4"><script src="static/app.js?v=20260927-events4" defer></script><script src="static/analytics.js?v=20260926-insights" defer></script></head>
+<body>
+<header><div class="brand"><span class="mark">Q</span><span>Codex <b>额度观察</b></span></div><div class="head-right"><span id="connection">等待连接</span><button id="change-password" class="quiet" hidden>修改密码</button><button id="logout" class="quiet" hidden>退出</button></div></header>
+<main>
+  <section id="login" class="login surface"><div class="eyebrow">QUOTA OBSERVATORY</div><h1>每一次额度变化，<br>都有迹可循。</h1><p>查看剩余额度、计划重置时间与历史变化。</p><form id="login-form"><label for="login-password">登录密码</label><div class="input-row"><input id="login-password" type="password" autocomplete="current-password" placeholder="输入登录密码" maxlength="256" required><button type="submit">打开看板</button></div><p class="muted">登录后可查看全部账号的额度与历史记录。</p></form><p id="login-error" class="error" role="alert"></p></section>
+  <div id="dashboard" hidden>
+    <div class="toolbar"><div><div class="eyebrow">QUOTA OBSERVATORY</div><h1 id="view-title">全部账号额度</h1><p id="freshness" class="muted">等待数据</p></div><div class="actions"><label class="sr-only" for="account">账号</label><select id="account" aria-label="账号"></select><a id="manage-accounts" class="secondary button-link" href="static/manage.html">账号管理</a><a class="secondary button-link" href="static/bark.html">Bark 推送</a><button id="refresh" class="secondary">刷新</button><button id="integration" class="secondary">接入 / 上传</button></div></div>
+    <nav class="view-tabs" aria-label="页面视图"><button id="overview-tab" aria-pressed="true">额度总览</button><button id="analysis-tab" aria-pressed="false">分析</button><button id="more-tab" aria-pressed="false">更多</button></nav>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <div id="overview-pane">
+    <section id="account-overview" aria-label="全部账号额度"></section>
+    <section id="quota-cards" class="cards" aria-label="额度窗口"></section>
+    <section class="surface insight-section" aria-labelledby="collector-title"><div class="section-head"><div><h2 id="collector-title">采集器上报状态</h2><p class="muted">根据服务器最近收到的 Windows / Mac 采集器上传判断；这不是程序进程心跳。超过 30 分钟提示延迟，超过 2 小时提示长时间未上报；上传间隔设为 0 时也会如此显示。</p></div></div><div id="collector-status-list" class="collector-grid"></div></section>
+    <section class="surface history" id="history-section"><div class="section-head"><div><h2>剩余额度走势</h2><p class="muted">采样之间的变化由上传记录推断</p></div></div><div id="charts"></div></section>
+    <section class="surface events"><div class="section-head"><div><h2>重置与变化记录</h2><p id="event-summary" class="muted"></p></div><div class="event-controls"><label>观察范围 <select id="days"><option value="1">最近 24 小时</option><option value="7" selected>最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option></select></label><label>类型 <select id="event-filter"><option value="all">全部变化</option><option value="reset">重置相关</option><option value="unexpected_reset">疑似突然重置</option><option value="uncertain">待确认</option></select></label></div></div><div id="event-list"></div><button id="more-events" class="secondary" type="button" aria-controls="event-list" aria-expanded="false" hidden>显示更多</button></section>
+    <section class="surface insight-section" aria-labelledby="timeline-title"><div class="section-head"><div><h2 id="timeline-title">重置事件时间轴</h2><p class="muted">按北京时间排列额度检测事件与 Tibo 提及额度的公开帖文。帖文只是线索，不能证明它导致了某次重置；事件时间为首次采样发现变化的时间。</p></div></div><div id="timeline-list" class="timeline-list"></div></section>
+    <section class="surface tibo-section" aria-labelledby="tibo-title">
+      <div class="section-head"><div><h2 id="tibo-title">Tibo 最近的 X 动态</h2><p class="muted">公开帖文可作为额度赠送或突然重置的线索；是否发生重置仍以账号额度采样为准。帖文发布时间和缓存检查时间均为北京时间（UTC+8）。</p></div><div class="tibo-links"><a href="https://x.com/thsottiaux" target="_blank" rel="noopener noreferrer">查看全部帖文 ↗</a><a href="https://x.com/search?q=from%3Athsottiaux%20%28reset%20OR%20usage%20OR%20limits%29&amp;f=live" target="_blank" rel="noopener noreferrer">搜索额度相关帖文 ↗</a></div></div>
+      <p id="tibo-status" class="muted tibo-status" role="status">正在读取文字缓存…</p>
+      <div id="tibo-posts" class="tibo-posts"></div>
+      <p class="muted tibo-hint">文字来自 <a href="https://x.noodl3.net/thsottiaux/rss" target="_blank" rel="noopener noreferrer">公开 RSS 订阅源</a>，不是 X 官方数据接口；只缓存文字，不抓取图片。点击每条帖文的原帖链接核对。缓存更新失败时继续显示上次成功获取的内容。</p>
+    </section>
+    <details class="rules"><summary>如何判断计划内重置与突然重置</summary><p id="rule-text"></p><p>计划时间变化本身不等于额度重置。缺少重置时间、采样跨越多个周期或处于时间边界时，标记为待确认。服务不会因倒计时结束自动把额度改成 100%。卡片中的“上次重置”不受观察范围筛选影响；检测时间是首次采样发现变化的时间，突发重置只能定位到两次采样之间。</p><p>本服务只能看到上传的数据，不能确定变化是否由平台赠送、人工兑换或额度校正引起。旧采样会保存，但不会回改已经生成的判断。</p></details>
+</div>
+<section id="analysis-pane" hidden>
+  <p id="analysis-pending" class="empty" hidden>正在读取分析数据…</p>
+  <div id="analysis-content" hidden>
+    <div id="analysis-empty" class="surface empty">这个账号尚未上传分析明细。使用采集脚本生成 JSON 后，通过“接入 / 上传”提交即可。</div>
+    <div id="analysis-sections">
+      <section class="surface analysis-section">
+        <div class="section-head"><div><h2>总用量历史记录</h2><p class="muted">查看用量分布及随时间的变化</p></div><div class="analysis-controls"><input type="hidden" id="analysis-days" value="7"><div class="day-toggle"><button data-analysis-days="7" aria-pressed="true">7 天</button><button data-analysis-days="30" aria-pressed="false">30 天</button></div><label><span class="sr-only">统计维度</span><select id="analysis-group" aria-label="统计维度"><option value="feature">按功能</option><option value="model">按模型</option><option value="surface">按客户端</option><option value="trigger">按触发方式</option></select></label></div></div>
+        <div id="usage-bars"></div><p id="legend-caption" class="muted"></p><div id="usage-legend"></div><p id="daily-freshness" class="analysis-note"></p>
+      </section>
+      <section class="surface analysis-section"><div class="section-head"><div><h2>聊天用量排行</h2><p class="muted">累计消耗与当前套餐额度对比；不受上方 7／30 天切换影响</p></div><label><span class="sr-only">排行指标</span><select id="chat-metric" aria-label="排行指标"><option value="weekly_limit_percent">按每周限额占比</option><option value="five_hour_limit_percent">按 5 小时限额占比</option></select></label></div><div id="chat-ranking"></div><button id="more-chats" class="secondary" hidden>显示更多</button><p id="chat-freshness" class="analysis-note"></p></section>
+      <section class="surface analysis-section"><h2>套餐用量历史</h2><p class="muted">检测到额度重置后会切分周期；保留统计时间及完整性标记，与上方维度联动</p><div id="period-history"></div></section>
+    </div>
+  </div>
+</section>
+<section id="more-pane" hidden>
+  <section class="surface insight-section" aria-labelledby="forecast-title"><div class="section-head"><div><h2 id="forecast-title">额度天气预报</h2><p class="muted">仅用最近连续采样的已用额度变化作粗略估计。数据不足、采样过期或跨越重置时不预测；实际额度以新采样为准。</p></div></div><div id="forecast-list" class="forecast-list"></div></section>
+</section>
+    <footer>时间显示为北京时间（UTC+8）；每日分析日期按 UTC<span>Codex Quota Monitor · Oracle Korea</span></footer>
+  </div>
+</main>
+<dialog id="integration-dialog"><div class="dialog-head"><h2>接入额度数据</h2><button id="close-dialog" class="secondary" aria-label="关闭">关闭</button></div><p>让 GPT 读取 Codex 额度后，将结果上传到此接口。每次上报保留真实采样时间。</p><p class="account-hint">每个账号使用不同且固定的 account 名称，例如 personal、work。收到新账号的第一条上报后，会自动出现在总览中；这些账号可以共用上传密钥。</p><div class="endpoint"><b>POST</b><code id="endpoint"></code></div><p>请求头：<code>Authorization: Bearer &lt;上传密钥&gt;</code><br><code>Content-Type: application/json</code></p><p>分析明细使用 <code>POST /api/analytics</code>，密钥相同。下方手动上传会自动识别采集脚本生成的分析 JSON。</p><pre id="example"></pre><p class="muted">支持完整的 get_usage_limits 返回值放在 usage 中；5 小时与每周窗口按 windowDurationMins 自动识别。observed_at 使用含时区的 ISO 时间或 Unix 时间戳；重试时保留相同 report_id、时间和内容。</p><a href="openapi.json" target="_blank" rel="noopener">查看 OpenAPI 接口描述 ↗</a><details><summary>手动粘贴上传</summary><form id="upload-form"><label for="upload-token">上传密钥</label><input id="upload-token" type="password" required autocomplete="off"><label for="payload">JSON 内容</label><textarea id="payload" rows="10" required spellcheck="false"></textarea><button type="submit" id="upload-button">提交额度记录</button></form><p id="upload-result" role="status"></p></details></dialog>
+<dialog id="accounts-dialog" aria-labelledby="accounts-title">
+  <div class="dialog-head"><h2 id="accounts-title">账号管理</h2><button id="close-accounts" class="secondary" aria-label="关闭账号管理">关闭</button></div>
+  <p class="muted">改名会迁移历史，并让旧名称继续指向新账号。合并会把两个名称的记录放在保留账号下；相同日期的分析统计采用较新的数据，不重复相加。</p>
+  <h3>现有账号</h3><div id="managed-accounts"></div>
+  <div class="management-grid">
+    <form id="rename-form" class="management-panel"><h3>改名</h3><label for="rename-account">原账号</label><select id="rename-account" required></select><label for="rename-new">新名称</label><input id="rename-new" maxlength="160" required><button type="submit">保存名称</button></form>
+    <form id="merge-form" class="management-panel"><h3>合并数据</h3><label for="merge-source">要并入的账号</label><select id="merge-source" required></select><label for="merge-target">保留的账号</label><select id="merge-target" required></select><button id="merge-submit" type="submit">合并到保留账号</button></form>
+  </div>
+  <form id="delete-form" class="management-panel danger-panel"><h3>删除账号及历史</h3><p class="muted">删除后同名采集上传会被拦截。请先停止对应采集器，或在下方允许重新使用该名称。</p><label for="delete-account">要删除的账号</label><select id="delete-account" required></select><label for="delete-confirm">输入账号全名确认</label><input id="delete-confirm" autocomplete="off" required><button type="submit" class="danger-button">删除账号及全部记录</button></form>
+  <h3>已删除的名称</h3><div id="blocked-accounts"></div>
+  <p id="account-management-status" role="status"></p>
+</dialog>
+<dialog id="password-dialog" aria-labelledby="password-title"><div class="dialog-head"><h2 id="password-title">修改登录密码</h2><button id="close-password" class="secondary" aria-label="关闭修改密码">关闭</button></div><p class="muted">修改后所有浏览器都需要重新登录。新密码至少 12 个字符。</p><form id="password-form"><label for="current-password">当前密码</label><input id="current-password" type="password" autocomplete="current-password" maxlength="256" required><label for="new-password">新密码</label><input id="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required><label for="confirm-password">确认新密码</label><input id="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required><p id="password-error" class="error" role="alert"></p><button id="save-password" type="submit">保存新密码</button></form></dialog>
+</body></html>

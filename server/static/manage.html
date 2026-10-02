@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="管理 Codex 额度观察账号">
+  <title>账号管理 · Codex 额度观察</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=20260925-alias-9c3f18">
+  <script src="manage.js?v=20260925-alias-9c3f18" defer></script>
+</head>
+<body>
+<header><div class="brand"><span class="mark">Q</span><span>Codex <b>额度观察</b></span></div></header>
+<main class="management-page">
+  <div class="page-head"><div><div class="eyebrow">QUOTA OBSERVATORY</div><h1>账号管理</h1></div><div class="page-actions"><a class="button-link secondary" href="bark.html">Bark 推送</a><a class="button-link secondary" href="../">返回看板</a></div></div>
+  <p id="account-management-status" role="status">正在读取账号…</p>
+  <section id="management-login" class="surface" hidden>
+    <h2>请先登录</h2><p>账号管理需要网页登录状态。</p><a class="button-link secondary" href="../">返回看板登录</a>
+  </section>
+  <div id="management-content" hidden>
+    <section class="surface">
+      <p class="muted">改名会迁移历史，并让旧名称继续指向新账号。要改回自己的旧名称，直接在“改名”中填写，无需先解除占用。合并会把两个名称的记录放在保留账号下；相同日期的分析统计采用较新的数据，不重复相加。</p><p class="muted">解除旧名称占用后，采集器若继续用这个名称上传，会生成独立账号；原有历史仍留在当前账号。</p>
+      <h3>现有账号</h3><div id="managed-accounts"></div>
+      <div class="management-grid">
+        <form id="rename-form" class="management-panel"><h3>改名</h3><label for="rename-account">原账号</label><select id="rename-account" required></select><label for="rename-new">新名称</label><input id="rename-new" maxlength="160" required><button type="submit">保存名称</button></form>
+        <form id="merge-form" class="management-panel"><h3>合并数据</h3><label for="merge-source">要并入的账号</label><select id="merge-source" required></select><label for="merge-target">保留的账号</label><select id="merge-target" required></select><button id="merge-submit" type="submit">合并到保留账号</button></form>
+      </div>
+      <form id="delete-form" class="management-panel danger-panel"><h3>删除账号及历史</h3><p class="muted">删除后同名采集上传会被拦截。请先停止对应采集器，或在下方允许重新使用该名称。</p><label for="delete-account">要删除的账号</label><select id="delete-account" required></select><label for="delete-confirm">输入账号全名确认</label><input id="delete-confirm" autocomplete="off" required><button type="submit" class="danger-button">删除账号及全部记录</button></form>
+      <h3>已删除的名称</h3><div id="blocked-accounts"></div>
+    </section>
+  </div>
+</main>
+</body>
+</html>

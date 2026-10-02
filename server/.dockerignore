@@ -1,0 +1,8 @@
+__pycache__
+*.sqlite3*
+*.env
+tests.py
+README.md
+nginx.conf.example
+deploy.sh
+credentials*

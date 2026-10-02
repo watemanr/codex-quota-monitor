@@ -1,0 +1,29 @@
+name: codex-quota-monitor
+services:
+  monitor:
+    image: codex-quota-monitor:local
+    build: .
+    container_name: codex-quota-monitor
+    restart: unless-stopped
+    env_file:
+      - /etc/codex-quota-monitor.env
+    # To replace the web password, uncomment both lines and choose a NEW value.
+    # Then run: sudo docker compose up -d --force-recreate
+    # environment:
+    #   WEB_PASSWORD: 'replace-with-your-own-long-random-password'
+    ports:
+      - '8765:8765'
+    volumes:
+      - /opt/codex-quota-monitor/data:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 128
+    mem_limit: 192m
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'

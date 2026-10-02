@@ -1,0 +1,409 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Codex 额度观察",
+    "version": "1.3.0",
+    "description": "接收 Codex 额度采样并根据相邻采样推断重置。配置 GPT Action 时，把 servers.url 改成你通过 Nginx 配置的 HTTPS 域名。Authorization 使用上传密钥。"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Window": {
+        "type": "object",
+        "required": [
+          "window_minutes",
+          "used_percent"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "同一额度窗口保持固定，例如 codex:300 或 codex:10080"
+          },
+          "label": {
+            "type": "string"
+          },
+          "window_minutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 525600
+          },
+          "used_percent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "resets_at": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Sample": {
+        "type": "object",
+        "required": [
+          "account",
+          "observed_at",
+          "report_id"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "description": "固定账号标识。默认读取原始 accountId 或使用 default。不要在多次上报间更换。"
+          },
+          "observed_at": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ],
+            "description": "真实采样时间；不要用上传时间替换历史采样时间。"
+          },
+          "report_id": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "每次采样的唯一 ID；重试保持不变。"
+          },
+          "source": {
+            "type": "string"
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Window"
+            },
+            "minItems": 1,
+            "maxItems": 32
+          },
+          "usage": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "原始 get_usage_limits JSON 或含 text content 的完整工具返回。与 windows 二选一。按 windowDurationMins 识别窗口，不假定 primary 总是 5 小时。"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "windows"
+            ]
+          },
+          {
+            "required": [
+              "usage"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/api/usage": {
+      "post": {
+        "operationId": "uploadCodexUsage",
+        "summary": "上传真实额度采样",
+        "description": "持久化额度采样；不兑换重置信用、不修改 OpenAI 账户。仅上传已经读取到的真实额度；null 窗口不要伪造。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Sample"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "重复 report_id，未重复写入"
+          },
+          "201": {
+            "description": "已保存；results 包含每个窗口的重置推断或 out_of_order 状态"
+          },
+          "401": {
+            "description": "上传密钥错误"
+          },
+          "409": {
+            "description": "同一 ID 或采样时间出现冲突数据"
+          },
+          "413": {
+            "description": "请求超过 256 KiB"
+          },
+          "422": {
+            "description": "额度或时间格式无效"
+          }
+        }
+      }
+    },
+    "/api/accounts": {
+      "get": {
+        "operationId": "listQuotaAccounts",
+        "summary": "列出已上报账号",
+        "responses": {
+          "200": {
+            "description": "账号及最近上报时间"
+          }
+        }
+      }
+    },
+    "/api/dashboard": {
+      "get": {
+        "operationId": "getQuotaDashboard",
+        "summary": "读取额度与重置历史",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 7
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "最新额度、趋势、独立重置时间轴事件、采集器上传状态及规则参数"
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "getServiceHealth",
+        "summary": "健康检查",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "服务及数据库可用"
+          }
+        }
+      }
+    },
+    "/api/overview": {
+      "get": {
+        "operationId": "getAllAccountsOverview",
+        "summary": "同时读取全部账号的额度与重置记录",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 7
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "按账号分组的最新额度、采集器上传状态、独立重置时间轴事件与变化计数；不混合计算额度"
+          },
+          "401": {
+            "description": "需要访问或上传密钥"
+          }
+        }
+      }
+    },
+    "/api/forecast": {
+      "get": {
+        "operationId": "getQuotaForecast",
+        "summary": "查看各账号最近采样的额度耗尽趋势估计",
+        "description": "仅用同一额度周期内连续且新鲜的采样计算。数据不足、采样过期或跨重置时不预测；估计不代表平台承诺。",
+        "parameters": [
+          {"name": "account", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "按账号分组的各额度窗口预测与不预测原因"},
+          "401": {"description": "需要登录或访问密钥"}
+        }
+      }
+    },
+    "/api/analytics": {
+      "post": {
+        "operationId": "uploadCodexAnalytics",
+        "summary": "上传真实用量分析明细",
+        "description": "与额度上传密钥相同。只接收统计结果，不接收 OpenAI 登录凭证或聊天正文。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "account",
+                  "observed_at",
+                  "report_id",
+                  "analytics"
+                ],
+                "properties": {
+                  "account": {
+                    "type": "string"
+                  },
+                  "observed_at": {
+                    "oneOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    ]
+                  },
+                  "report_id": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "analytics": {
+                    "type": "object",
+                    "description": "daily、periods、chats 至少一项，详见采集脚本与接入说明",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "重复或过期快照已跳过"
+          },
+          "201": {
+            "description": "分析数据已保存"
+          },
+          "401": {
+            "description": "上传密钥无效"
+          },
+          "409": {
+            "description": "相同 ID 的内容冲突"
+          },
+          "422": {
+            "description": "数据格式无效"
+          }
+        }
+      },
+      "get": {
+        "operationId": "getCodexAnalytics",
+        "summary": "读取指定账号的用量分析",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [
+                7,
+                30
+              ],
+              "default": 7
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "feature",
+                "model",
+                "surface",
+                "trigger"
+              ],
+              "default": "feature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "日用量、聊天排行和套餐周期；available=false 表示未收到分析数据"
+          },
+          "401": {
+            "description": "需要访问或上传密钥"
+          }
+        }
+      }
+    },
+    "/api/tibo": {
+      "get": {
+        "summary": "Read cached Tibo public post text",
+        "description": "Returns the server's text-only RSS cache, source and fetch time. Posts are untrusted external content and do not confirm quota resets. Requires a browser session or read/upload bearer token.",
+        "responses": {
+          "200": {"description": "Cached posts and fetch status"},
+          "401": {"description": "Not authenticated"}
+        }
+      }
+    },
+    "/api/reset-status": {
+      "get": {
+        "operationId": "getResetStatus",
+        "summary": "读取指定账号每个窗口最近检测到的重置",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "last_resets 按 window_id 返回最近记录；detected_at 为检测时间，非精确发生时间。"
+          },
+          "401": {
+            "description": "访问密钥无效"
+          }
+        }
+      }
+    }
+  }
+}

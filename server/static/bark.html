@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="按账号设置 Codex 额度 Bark 推送">
+  <title>Bark 推送 · Codex 额度观察</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=20260926-bark">
+  <script src="bark.js?v=20261002-tibo" defer></script>
+</head>
+<body>
+<header><div class="brand"><span class="mark">Q</span><span>Codex <b>额度观察</b></span></div></header>
+<main class="management-page">
+  <div class="page-head"><div><div class="eyebrow">QUOTA OBSERVATORY</div><h1>Bark 推送</h1></div><a class="button-link secondary" href="../">返回看板</a></div>
+  <p id="bark-status" role="status">正在读取配置…</p>
+  <section id="bark-login" class="surface" hidden><h2>请先登录</h2><p>推送设置需要网页登录状态。</p><a class="button-link secondary" href="../">返回看板登录</a></section>
+  <section id="bark-content" class="surface" hidden>
+    <p class="muted">每个 Codex 账号可以设置独立的 Bark 服务器和接收 key。只填写服务器地址，例如 <code>http://你的服务器:40011</code>；key 单独填写，保存后不会在网页回显。系统使用 Bark 的 <code>POST /push</code> 接口发送。</p>
+    <label for="bark-account">选择 Codex 账号</label><select id="bark-account" required></select>
+    <form id="bark-form">
+      <div class="bark-grid">
+        <div><label for="bark-url">Bark 服务器地址</label><input id="bark-url" type="url" placeholder="http://你的服务器:40011" maxlength="512" required></div>
+        <div><label for="bark-key">设备 key</label><input id="bark-key" type="password" autocomplete="new-password" placeholder="首次必填；留空保持原 key" maxlength="256"><p id="bark-key-hint" class="muted"></p></div>
+        <div><label for="bark-group">通知分组</label><input id="bark-group" maxlength="64" value="Codex额度" required></div>
+        <div><label for="bark-threshold">低额度警告阈值（剩余 %）</label><input id="bark-threshold" type="number" min="0" max="50" step="0.1" value="5" required></div>
+        <div><label for="bark-interval">定时报告间隔（分钟）</label><input id="bark-interval" type="number" min="0" max="10080" step="1" value="0" required><p class="muted">填 0 关闭定时报告；启用时最短 5 分钟。报告会注明最后采样时间。</p></div>
+      </div>
+      <div class="bark-options">
+        <label><input id="bark-enabled" type="checkbox"> 启用此账号的自动推送</label>
+        <label><input id="bark-5h-reset" type="checkbox" checked> 5h 额度重置</label>
+        <label><input id="bark-weekly-reset" type="checkbox" checked> weekly 额度重置</label>
+        <label><input id="bark-5h-low" type="checkbox" checked> 5h 低额度警告</label>
+        <label><input id="bark-weekly-low" type="checkbox" checked> weekly 低额度警告</label>
+        <label><input id="bark-tibo-posts" type="checkbox"> Tibo 额度相关新帖</label>
+      </div>
+      <p class="muted">低额度警告只在首次低于阈值时发送；额度明显回升后再次跌破才会重发。重置提醒只针对检测到额度回升的事件，单纯预计时间变化不推送。</p>
+      <p class="muted">Tibo 通知按公开帖文的额度关键词匹配，附原文和链接；不代表已发生重置。首次开启最多补推近 6 小时内最新的一条相关帖，之后只推送新发现的帖文。同一 Bark 地址和 key 只发送一份。须同时开启此账号的自动推送。</p>
+      <div class="bark-actions"><button id="bark-save" type="submit">保存设置</button><button id="bark-test" type="button" class="secondary">发送测试通知</button><button id="bark-refresh" type="button" class="secondary">刷新发送状态</button><button id="bark-remove" type="button" class="danger-button">删除此账号 Bark 配置</button></div>
+    </form>
+    <h3>最近发送记录</h3><div id="bark-recent"></div>
+  </section>
+</main>
+</body>
+</html>
