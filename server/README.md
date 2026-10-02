@@ -63,6 +63,8 @@ sudo docker compose up -d --force-recreate
 
 服务端按 [Bark 的 POST /push 接口](https://github.com/Finb/bark-server/blob/master/docs/API_V2.md)发送 JSON，请求体包含设备 key，避免 key 出现在请求 URL 和访问日志中。通知分组默认是 Codex额度。设置页的「发送测试通知」需要手动点击，保存配置本身不会发测试消息。
 
+所有通知显式设置 `isArchive="1"`，保存到手机 Bark 的历史消息中；不发送 `ttl`，不设置自动过期时间。Bark 的 `ttl` 指历史消息的保留秒数，旧版的 `ttl=600` 会使消息十分钟后过期。升级只影响之后发送的消息，不会恢复手机上已经清理的历史。点击后系统通知消失时，可在 Bark 内按通知分组查看历史；手机端手动删除等操作仍会影响保留。
+
 每个账号可以单独开启或关闭：
 
 - 5h / weekly 额度重置：只在新采样显示已用量明显下降、被判定为计划内或疑似突发重置时通知。预计重置时间移动、没有额度回升的周期切换不作为重置提醒。

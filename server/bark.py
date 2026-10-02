@@ -54,9 +54,10 @@ def validate_key(value):
 
 def send_bark(setting, title, body):
     """POST JSON keeps the device key out of URL/access logs."""
+    # Bark's ttl expires archived messages, so omit it and explicitly archive.
     payload = json.dumps(dict(
         device_key=setting['device_key'], title=title, body=body,
-        group=setting['group_name'], ttl=600,
+        group=setting['group_name'], isArchive='1',
     ), ensure_ascii=False).encode('utf-8')
     req = urllib.request.Request(
         setting['server_url'].rstrip('/') + '/push', data=payload,

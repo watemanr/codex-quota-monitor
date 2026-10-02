@@ -926,7 +926,10 @@ class BarkTests(unittest.TestCase):
         self.assertEqual(request.get_method(),'POST')
         self.assertEqual(request.full_url,'http://example.test:40011/push')
         self.assertNotIn('A'*24,request.full_url)
-        self.assertEqual(json.loads(request.data)['device_key'],'A'*24)
+        payload=json.loads(request.data)
+        self.assertEqual(payload['device_key'],'A'*24)
+        self.assertEqual(payload['isArchive'],'1')
+        self.assertNotIn('ttl',payload)
         self.assertEqual(timeout,5)
 
     def test_tibo_quota_post_bootstrap_new_post_and_deduplication(self):
