@@ -57,6 +57,23 @@ def unwrap(value):
     return value
 
 
+def extract_reset_cards(data):
+    """Keep the provider's authoritative count; absent/null never means zero."""
+    for field in ('reset_cards', 'rateLimitResetCredits', 'rate_limit_reset_credits'):
+        if field not in data:
+            continue
+        value = data[field]
+        if value is None:
+            return {'reset_cards': None}
+        if not isinstance(value, dict):
+            raise ValueError('重置卡数据必须是对象或 null')
+        count = value.get('available_count', value.get('availableCount'))
+        if isinstance(count, bool) or not isinstance(count, int) or not 0 <= count <= 1000000:
+            raise ValueError('重置卡 available_count 必须是非负整数')
+        return {'reset_cards': {'available_count': count}}
+    return {}
+
+
 def normalize(payload, now):
     outer = unwrap(payload)
     data = unwrap(outer.get('usage', outer))
@@ -114,7 +131,8 @@ def normalize(payload, now):
                            'window_minutes': minutes, 'used_percent': used,
                            'resets_at': timestamp(w.get('resets_at'), 'resets_at', optional=True)})
     return dict(account=account, observed_at=observed, source=source, report_id=report_id,
-                plan=plan if isinstance(plan, str) and len(plan) <= 80 else None, windows=normalized)
+                plan=plan if isinstance(plan, str) and len(plan) <= 80 else None, windows=normalized,
+                **extract_reset_cards(data))
 
 
 def classify(previous, current, tolerance=300, minimum_drop=2):

@@ -17,8 +17,9 @@ import urllib.request
 import uuid
 
 from collect_analytics import collect as collect_analytics, NoRedirect
+from detection import extract_reset_cards
 
-VERSION = '1.2.1'
+VERSION = '1.3.0'
 DEFAULT_URL = ''
 MAX_UPLOAD = 262144
 
@@ -155,8 +156,14 @@ def convert_quota(raw, account, observed_at):
                         'used_percent':used,'resets_at':reset})
     if not windows:
         raise CollectorError('接口未返回可用的实时额度窗口；不会把缺失值当成 0')
+    try:
+        cards = extract_reset_cards(raw)
+    except ValueError as exc:
+        cards = {'reset_cards': None}
+        warnings.append(str(exc)+'；重置卡数量保留为未知')
     return {'account':account,'observed_at':observed_at,'report_id':str(uuid.uuid4()),
-            'source':'macos-collector' if sys.platform=='darwin' else 'windows-collector','windows':windows}, warnings
+            'source':'macos-collector' if sys.platform=='darwin' else 'windows-collector',
+            'windows':windows, **cards}, warnings
 
 
 def collect_snapshot(home, account, include_analytics=True, expected_identity=None, progress=lambda message:None):

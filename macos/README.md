@@ -1,6 +1,6 @@
 # Codex 用量采集器 · macOS
 
-这是现有 Windows 采集器的 macOS 适配版，版本 1.2.1。复用额度采集、上传队列、定时器及重置检测，增加 macOS 原生菜单栏图标、系统通知和上传密钥钥匙串保存。
+这是现有 Windows 采集器的 macOS 适配版，版本 1.3.0。复用额度采集、上传队列、定时器及重置检测，增加 macOS 原生菜单栏图标、系统通知和上传密钥钥匙串保存。
 
 **当前交付状态：源码与打包工具已完成，Windows 环境通过 13 项 macOS 适配逻辑测试和 44 项原有客户端测试。也通过了非 Windows 隔离容器中的 13 项适配测试和 43 项共享测试（Windows DPAPI 测试跳过）。尚未在真实 Mac 上运行或打包，不包含已经验证的 `.app` / DMG。** Mac 上运行下面的构建脚本后，必须通过窗口和菜单栏离线自检，才会产生可分发 ZIP。
 
@@ -93,3 +93,7 @@ macos/.build-env/bin/python -m unittest discover -s windows/source -p 'test_*.py
 源码启动时系统通知回退为应用内提示；原生通知需从打包后的 App 运行。Windows 专属 DPAPI 测试在 Mac 上跳过，其余共享采集 / 上传测试照常运行。`--smoke-test --data-dir <独立测试目录>` 用于离线原生界面自检。
 
 平台适配位于 `macos/source/`；共享逻辑暂存于 `windows/source/`，打包时一并加载，所以不能只复制 macos/source 单个目录运行。
+
+## 重置卡统计（v1.3.0）
+
+拉取新版源码后重新运行 `macos/build.command`。实时额度采集会同时读取真实重置卡总数，在主窗口显示并上传到网页形成增减记录；无需额外配置，不会兑换或使用重置卡。缺失字段显示未知。Mac 与 Windows 使用同一采集与解析代码。

@@ -2,7 +2,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home quota && mkdir /data && chown quota:quota /data
-COPY app.py detection.py analytics.py browser_auth.py account_management.py bark.py tibo.py insights.py ./
+COPY app.py detection.py analytics.py browser_auth.py account_management.py bark.py tibo.py insights.py reset_cards.py ./
 COPY static ./static
 USER 10001:10001
 EXPOSE 8765

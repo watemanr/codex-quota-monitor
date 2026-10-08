@@ -196,6 +196,25 @@ function renderForecast(data){
     root.append(group);
   });
 }
+function renderResetCards(stats){
+  const box=el('section','reset-card-stats'),head=el('div','reset-card-head');
+  head.append(el('h3','','重置卡'),el('strong','reset-card-count',stats?.available_count==null?'未知':stats.available_count+' 张'));
+  box.append(head);
+  if(!stats){box.append(el('p','muted','尚未上报重置卡数量。请使用 v1.3.0 或更新的 Windows / Mac 采集器，读取并上传一次。'));return box;}
+  box.append(el('p','muted',`采样 ${tiboTime(stats.observed_at)}${stats.stale?' · 超过 30 分钟，当前数量可能已变化':''}`));
+  if(stats.available_count==null)box.append(el('p','muted',stats.last_known_count==null?'接口未返回重置卡数量，不代表 0 张。':`本次未返回数量；上次已知为 ${stats.last_known_count} 张（${tiboTime(stats.last_known_at)}）。`));
+  if(stats.baseline_at!=null)box.append(el('p','muted',`首次记录 ${stats.baseline_count} 张 · ${tiboTime(stats.baseline_at)}`));
+  const changeText=e=>`${e.before_count} → ${e.after_count} 张 · ${e.delta>0?'增加':'减少'} ${Math.abs(e.delta)} 张`;
+  if(stats.last_change)box.append(el('p','reset-card-last',`最近变化：${changeText(stats.last_change)} · ${tiboTime(stats.last_change.observed_at)}`));
+  else box.append(el('p','reset-card-last','尚未观察到数量变化'));
+  box.append(el('p','',`所选范围观察到：增加 ${stats.increases} 张 · 减少 ${stats.decreases} 张`));
+  const row=e=>{const item=el('div','reset-card-event');item.append(el('strong','',changeText(e)),el('small','muted',`发现于 ${tiboTime(e.observed_at)}；上次采样 ${tiboTime(e.interval_start)}`));return item;};
+  const events=stats.events||[];events.slice(0,4).forEach(e=>box.append(row(e)));
+  if(events.length>4){const more=el('details','reset-card-more');more.append(el('summary','','展开更多变化'));events.slice(4).forEach(e=>more.append(row(e)));box.append(more);}
+  if(stats.event_count>events.length)box.append(el('small','muted',`共 ${stats.event_count} 次变化，仅展示最近 ${events.length} 次。`));
+  box.append(el('small','muted','仅比较相邻有效采样的数量；减少可能是使用或过期，同一采样间隔内一增一减可能抵消。突发额度重置不会被算成发卡。'));
+  return box;
+}
 function renderOverview(accounts){
   const root=$('#account-overview');root.replaceChildren();
   if(!accounts.length){root.append(el('div','surface empty','还没有账号数据。点击“接入 / 上传”，收到第一条上报后会自动显示。'));return;}
@@ -207,7 +226,7 @@ function renderOverview(accounts){
     const detail=el('button','secondary','查看历史');detail.type='button';detail.setAttribute('aria-label','查看 '+account.account+' 的历史');
     detail.addEventListener('click',()=>{$('#account').value=account.account;refresh();window.scrollTo({top:0,behavior:'smooth'});});
     head.append(identity,detail);group.append(head);
-    const cards=el('div','cards');fillCards(cards,account.latest);group.append(cards);
+    const cards=el('div','cards');fillCards(cards,account.latest);group.append(cards,renderResetCards(account.reset_cards));
     const counts=account.counts,scheduled=(counts.scheduled_reset||0)+(counts.scheduled_rollover||0);
     group.append(el('p','account-changes','所选范围：'+scheduled+' 次计划内变化 · '+(counts.unexpected_reset||0)+' 次疑似突然重置 · '+(counts.uncertain||0)+' 次待确认'));
     root.append(group);
@@ -218,6 +237,8 @@ function render(){
   if(state.view==='more'){renderForecast(state.data);return;}
   const data=state.data,all=Array.isArray(data.accounts);
   $('#account-overview').hidden=!all;$('#quota-cards').hidden=all;$('#history-section').hidden=all;
+  $('#reset-card-section').hidden=all;
+  $('#reset-card-section').replaceChildren(...(all?[]:[renderResetCards(data.reset_cards)]));
   $('#view-title').textContent=all?'全部账号额度':data.account+' · 额度概览';
   const windows=all?data.accounts.flatMap(a=>a.latest):data.latest;
   if(all){
@@ -237,7 +258,7 @@ function render(){
 function clearLoginState(){
   state.authGeneration++;state.authenticated=false;state.csrf='';state.data=null;state.tiboData=null;state.pending=false;state.showAllEvents=false;state.eventsContext='';
   analysisState.data=null;$('#analysis-content').hidden=true;
-  for(const id of ['account-overview','quota-cards','charts','event-list','collector-status-list','timeline-list','forecast-list'])$('#'+id).replaceChildren();
+  for(const id of ['account-overview','quota-cards','reset-card-section','charts','event-list','collector-status-list','timeline-list','forecast-list'])$('#'+id).replaceChildren();
   if($('#integration-dialog').open)$('#integration-dialog').close();
   if($('#password-dialog').open)$('#password-dialog').close();
   $('#tibo-posts').replaceChildren();$('#tibo-status').textContent='正在读取文字缓存…';$('#password-form').reset();$('#upload-token').value='';$('#payload').value='';showLogin();
@@ -357,4 +378,4 @@ $('#upload-form').addEventListener('submit',async e=>{e.preventDefault();$('#upl
 setInterval(()=>{if(state.authenticated&&!$('#dashboard').hidden&&!document.hidden)refresh();},30000);
 restoreSession();
 // Progressive enhancement; unsupported browsers keep the same working UI.
-if(document.modelContext?.registerTool){const lifecycle=new AbortController();window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});Promise.resolve(document.modelContext.registerTool({name:'read_codex_quota_dashboard',title:'读取 Codex 额度看板',description:'读取当前已登录账号的额度与变化记录；不会上传数据。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},async execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('参数必须是空对象');if(!state.authenticated)throw new Error('请先使用密码登录');const generation=state.authGeneration;const result=await api(dataPath());if(generation!==state.authGeneration)throw new Error('登录状态已变化');state.data=result;render();if(state.view==='analysis')return result;if(state.view==='more')return {forecasts:result.forecasts,method:result.method};return result.accounts?{accounts:result.accounts,counts:result.counts}:{account:result.account,latest:result.latest.map(({history,...w})=>w),counts:result.counts};}},{signal:lifecycle.signal})).catch(()=>{});}
+if(document.modelContext?.registerTool){const lifecycle=new AbortController();window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});Promise.resolve(document.modelContext.registerTool({name:'read_codex_quota_dashboard',title:'读取 Codex 额度看板',description:'读取当前已登录账号的额度与变化记录；不会上传数据。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},async execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw new Error('参数必须是空对象');if(!state.authenticated)throw new Error('请先使用密码登录');const generation=state.authGeneration;const result=await api(dataPath());if(generation!==state.authGeneration)throw new Error('登录状态已变化');state.data=result;render();if(state.view==='analysis')return result;if(state.view==='more')return {forecasts:result.forecasts,method:result.method};return result.accounts?{accounts:result.accounts,counts:result.counts}:{account:result.account,latest:result.latest.map(({history,...w})=>w),reset_cards:result.reset_cards,counts:result.counts};}},{signal:lifecycle.signal})).catch(()=>{});}

@@ -17,6 +17,7 @@ from account_management import register_account_management, DeletedAccount
 from bark import register_bark
 from tibo import register_tibo
 from insights import collector_status, forecasts
+from reset_cards import reset_card_stats
 
 BASE = Path(__file__).resolve().parent
 LABELS = {'baseline': '建立基线', 'scheduled_reset': '计划内重置', 'scheduled_rollover': '计划周期切换',
@@ -77,6 +78,12 @@ def create_app(config=None):
         CREATE INDEX IF NOT EXISTS events_time ON events(observed_at DESC, id DESC);
         CREATE INDEX IF NOT EXISTS reports_account_time ON reports(account, observed_at DESC);
         ''')
+        columns = {row['name'] for row in conn.execute('PRAGMA table_info(reports)')}
+        if 'reset_card_count' not in columns:
+            conn.execute('ALTER TABLE reports ADD COLUMN reset_card_count INTEGER')
+        if 'reset_cards_reported' not in columns:
+            conn.execute('ALTER TABLE reports ADD COLUMN reset_cards_reported INTEGER NOT NULL DEFAULT 0')
+        conn.execute('CREATE INDEX IF NOT EXISTS reports_reset_cards ON reports(account,observed_at) WHERE reset_cards_reported=1')
 
     browser_authenticated,browser_write=register_browser_auth(app,db)
 
@@ -148,6 +155,14 @@ def create_app(config=None):
                     return jsonify(error='相同 report_id 对应不同内容；重试必须保留原始采样时间及数据'), 409
                 return jsonify(status='duplicate', report_id=old['id'], results=[])
             # Validate the entire report before any write, so conflicts are atomic.
+            cards = data.get('reset_cards')
+            card_count = cards['available_count'] if cards is not None else None
+            if card_count is not None:
+                conflict = conn.execute('''SELECT 1 FROM reports WHERE account=? AND observed_at=?
+                    AND reset_card_count IS NOT NULL AND reset_card_count!=? LIMIT 1''',
+                    (data['account'], data['observed_at'], card_count)).fetchone()
+                if conflict:
+                    return jsonify(error='同一采样时间已存在不同的重置卡数量'), 409
             for w in data['windows']:
                 old_sample = conn.execute('SELECT * FROM samples WHERE account=? AND window_id=? AND observed_at=?',
                                           (data['account'], w['window_id'], data['observed_at'])).fetchone()
@@ -155,6 +170,9 @@ def create_app(config=None):
                     return jsonify(error='同一窗口和采样时间已存在不同数据；请核对 observed_at'), 409
             rid = conn.execute('INSERT INTO reports(account,report_key,digest,observed_at,received_at,source,plan) VALUES(?,?,?,?,?,?,?)',
                                (data['account'], key, digest, data['observed_at'], now, data['source'], data['plan'])).lastrowid
+            if 'reset_cards' in data:
+                conn.execute('UPDATE reports SET reset_card_count=?,reset_cards_reported=1 WHERE id=?',
+                             (card_count, rid))
             for w in data['windows']:
                 old_sample = conn.execute('SELECT id FROM samples WHERE account=? AND window_id=? AND observed_at=?',
                                           (data['account'], w['window_id'], data['observed_at'])).fetchone()
@@ -239,8 +257,9 @@ def create_app(config=None):
             counts = {r['kind']: r['n'] for r in conn.execute(f'SELECT kind,COUNT(*) AS n FROM events WHERE account=? AND observed_at>=? AND {VISIBLE_EVENT_SQL} GROUP BY kind', (account, cutoff))}
             report = conn.execute('SELECT observed_at,received_at,source,plan FROM reports WHERE account=? ORDER BY observed_at DESC,received_at DESC LIMIT 1', (account,)).fetchone()
             collector_status_snapshot = collector_status(conn, now, account)
+            cards = reset_card_stats(conn, now, cutoff, account).get(account)
         return jsonify(account=account, now=now, days=days, latest=latest, events=events, timeline_events=timeline_events, counts=counts,
-                       collectors=collector_status_snapshot,
+                       collectors=collector_status_snapshot, reset_cards=cards,
                        labels=LABELS, last_report=dict(report) if report else None,
                        rules=dict(tolerance_seconds=app.config['RESET_TOLERANCE_SECONDS'], minimum_drop_pp=app.config['MINIMUM_DROP_PP']))
 
@@ -278,6 +297,9 @@ def create_app(config=None):
             events = [dict(r) for r in conn.execute(f'SELECT * FROM events WHERE observed_at>=? AND {VISIBLE_EVENT_SQL} ORDER BY observed_at DESC,id DESC LIMIT 200', (cutoff,))]
             timeline_events = [dict(r) for r in conn.execute("SELECT * FROM events WHERE observed_at>=? AND kind IN ('scheduled_reset','unexpected_reset','uncertain') ORDER BY observed_at DESC,id DESC LIMIT 80", (cutoff,))]
             collector_status_snapshot = collector_status(conn, now)
+            card_stats = reset_card_stats(conn, now, cutoff)
+            for name, item in grouped.items():
+                item['reset_cards'] = card_stats.get(name)
         return jsonify(accounts=list(grouped.values()), now=now, days=days, events=events, timeline_events=timeline_events, counts=counts,
                        collectors=collector_status_snapshot,
                        labels=LABELS, rules=dict(tolerance_seconds=app.config['RESET_TOLERANCE_SECONDS'], minimum_drop_pp=app.config['MINIMUM_DROP_PP']))

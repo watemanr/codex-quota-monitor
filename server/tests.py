@@ -127,6 +127,106 @@ class APITests(unittest.TestCase):
     def login(self,client=None,headers=None):
         return (client or self.client).post('/api/login',json={'password':TEST_PASSWORD},headers=headers or {})
 
+    def card_sample(self, offset, count, **extra):
+        payload=self.payload(offset)
+        payload['reset_cards']=None if count is None else {'available_count':count}
+        payload.update(extra)
+        return self.send(payload)
+
+    def test_reset_cards_baseline_increase_decrease_and_retry(self):
+        self.assertEqual(self.card_sample(0,2).status_code,201)
+        stats=self.dashboard()['reset_cards']
+        self.assertEqual(stats['available_count'],2)
+        self.assertEqual(stats['increases'],0)
+        self.assertIsNone(stats['last_change'])
+        self.card_sample(60,3)
+        self.card_sample(120,3)
+        self.card_sample(180,1)
+        self.assertEqual(self.card_sample(180,1).json['status'],'duplicate')
+        self.card_sample(180,1,report_id='same-time-new-id')
+        stats=self.dashboard()['reset_cards']
+        self.assertEqual((stats['available_count'],stats['increases'],stats['decreases']),(1,1,2))
+        self.assertEqual([e['delta'] for e in stats['events']],[-2,1])
+        self.assertEqual(stats['events'][0]['interval_start'],self.t+120)
+        overview=self.client.get('/api/overview',headers=self.read).json
+        self.assertEqual(overview['accounts'][0]['reset_cards'],stats)
+
+    def test_reset_cards_unknown_zero_and_older_collector(self):
+        self.send(self.payload())
+        self.assertIsNone(self.dashboard()['reset_cards'])
+        self.card_sample(60,0)
+        self.assertEqual(self.dashboard()['reset_cards']['available_count'],0)
+        self.card_sample(120,None)
+        stats=self.dashboard()['reset_cards']
+        self.assertIsNone(stats['available_count'])
+        self.assertEqual(stats['last_known_count'],0)
+        self.assertEqual(stats['event_count'],0)
+        self.send(self.payload(150))
+        self.assertEqual(self.dashboard()['reset_cards']['observed_at'],self.t+120)
+        self.card_sample(180,2)
+        self.assertEqual(self.dashboard()['reset_cards']['increases'],2)
+
+    def test_reset_cards_late_upload_and_conflicts_are_atomic(self):
+        self.card_sample(0,1)
+        self.card_sample(180,3)
+        self.card_sample(60,2)
+        stats=self.dashboard()['reset_cards']
+        self.assertEqual(stats['available_count'],3)
+        self.assertEqual([e['delta'] for e in stats['events']],[1,1])
+        self.assertEqual(self.card_sample(180,9,report_id='conflict').status_code,409)
+        self.assertEqual(self.card_sample(240,-1).status_code,422)
+        self.assertEqual(self.dashboard()['reset_cards']['available_count'],3)
+        with closing(sqlite3.connect(self.config['DB_PATH'])) as conn:
+            self.assertEqual(conn.execute('SELECT COUNT(*) FROM reports').fetchone()[0],3)
+
+    def test_reset_cards_official_shape_and_count_is_authoritative(self):
+        payload=self.payload()
+        payload['rateLimitResetCredits']={'availableCount':3,'credits':[{'id':'one-detail-only'}]}
+        self.assertEqual(self.send(payload).status_code,201)
+        self.assertEqual(self.dashboard()['reset_cards']['available_count'],3)
+        for index,value in enumerate([True,-1,1.5,'3',{},float('nan')]):
+            self.assertEqual(self.card_sample(index+1,value).status_code,422)
+        # Existing reports must keep their old digest when the field is absent.
+        normalized=normalize(self.payload(),time.time())
+        self.assertNotIn('reset_cards',normalized)
+
+    def test_reset_cards_range_and_staleness(self):
+        self.card_sample(-3*86400,1)
+        self.card_sample(-2*86400,2)
+        self.card_sample(0,3)
+        stats=self.client.get('/api/dashboard?account=test&days=1',headers=self.read).json['reset_cards']
+        self.assertEqual(stats['increases'],1)
+        self.assertEqual(stats['baseline_count'],1)
+        self.assertEqual(stats['available_count'],3)
+        self.assertTrue(stats['stale'])
+
+    def test_reset_cards_follow_account_rename_merge_delete(self):
+        self.card_sample(0,1)
+        self.card_sample(60,2,account='other',report_id='other')
+        csrf=self.login().json['csrf_token']
+        headers={'X-CSRF-Token':csrf}
+        response=self.client.post('/api/accounts/rename',json={'account':'test','new_name':'renamed'},headers=headers)
+        self.assertEqual(response.status_code,200,response.json)
+        response=self.client.post('/api/accounts/merge',json={'source':'other','target':'renamed'},headers=headers)
+        self.assertEqual(response.status_code,200,response.json)
+        stats=self.client.get('/api/dashboard?account=renamed',headers=self.read).json['reset_cards']
+        self.assertEqual((stats['available_count'],stats['increases']),(2,1))
+        response=self.client.post('/api/accounts/delete',json={'account':'renamed','confirm_name':'renamed'},headers=headers)
+        self.assertEqual(response.status_code,200,response.json)
+        with closing(sqlite3.connect(self.config['DB_PATH'])) as conn:
+            self.assertEqual(conn.execute('SELECT COUNT(*) FROM reports WHERE reset_cards_reported=1').fetchone()[0],0)
+
+    def test_reset_cards_schema_migration_preserves_old_reports(self):
+        self.send(self.payload())
+        with closing(sqlite3.connect(self.config['DB_PATH'])) as conn:
+            conn.execute('DROP INDEX reports_reset_cards')
+            conn.execute('ALTER TABLE reports DROP COLUMN reset_card_count')
+            conn.execute('ALTER TABLE reports DROP COLUMN reset_cards_reported')
+            conn.commit()
+        app=create_app(self.config)
+        self.assertIsNone(app.test_client().get('/api/dashboard?account=test',headers=self.read).json['reset_cards'])
+        self.assertEqual(app.test_client().post('/api/usage',json=self.payload(),headers=self.upload).json['status'],'duplicate')
+
     def test_browser_password_login_reads_all_views(self):
         self.send(self.payload())
         self.assertEqual(self.client.get('/api/session').json,{'authenticated':False})

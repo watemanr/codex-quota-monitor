@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Codex 额度历史与重置观察"><title>Codex 额度观察</title><link rel="icon" href="static/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="static/style.css?v=20260927-events4"><script src="static/app.js?v=20260927-events4" defer></script><script src="static/analytics.js?v=20260926-insights" defer></script></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Codex 额度历史与重置观察"><title>Codex 额度观察</title><link rel="icon" href="static/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="static/style.css?v=20261008-reset-cards"><script src="static/app.js?v=20261008-reset-cards" defer></script><script src="static/analytics.js?v=20260926-insights" defer></script></head>
 <body>
 <header><div class="brand"><span class="mark">Q</span><span>Codex <b>额度观察</b></span></div><div class="head-right"><span id="connection">等待连接</span><button id="change-password" class="quiet" hidden>修改密码</button><button id="logout" class="quiet" hidden>退出</button></div></header>
 <main>
@@ -11,6 +11,7 @@
     <div id="overview-pane">
     <section id="account-overview" aria-label="全部账号额度"></section>
     <section id="quota-cards" class="cards" aria-label="额度窗口"></section>
+    <section id="reset-card-section" class="surface insight-section" aria-label="重置卡统计"></section>
     <section class="surface insight-section" aria-labelledby="collector-title"><div class="section-head"><div><h2 id="collector-title">采集器上报状态</h2><p class="muted">根据服务器最近收到的 Windows / Mac 采集器上传判断；这不是程序进程心跳。超过 30 分钟提示延迟，超过 2 小时提示长时间未上报；上传间隔设为 0 时也会如此显示。</p></div></div><div id="collector-status-list" class="collector-grid"></div></section>
     <section class="surface history" id="history-section"><div class="section-head"><div><h2>剩余额度走势</h2><p class="muted">采样之间的变化由上传记录推断</p></div></div><div id="charts"></div></section>
     <section class="surface events"><div class="section-head"><div><h2>重置与变化记录</h2><p id="event-summary" class="muted"></p></div><div class="event-controls"><label>观察范围 <select id="days"><option value="1">最近 24 小时</option><option value="7" selected>最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option></select></label><label>类型 <select id="event-filter"><option value="all">全部变化</option><option value="reset">重置相关</option><option value="unexpected_reset">疑似突然重置</option><option value="uncertain">待确认</option></select></label></div></div><div id="event-list"></div><button id="more-events" class="secondary" type="button" aria-controls="event-list" aria-expanded="false" hidden>显示更多</button></section>

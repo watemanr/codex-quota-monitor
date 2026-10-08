@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Codex 额度观察",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "接收 Codex 额度采样并根据相邻采样推断重置。配置 GPT Action 时，把 servers.url 改成你通过 Nginx 配置的 HTTPS 域名。Authorization 使用上传密钥。"
   },
   "servers": [
@@ -107,6 +107,23 @@
             "type": "object",
             "additionalProperties": true,
             "description": "原始 get_usage_limits JSON 或含 text content 的完整工具返回。与 windows 二选一。按 windowDurationMins 识别窗口，不假定 primary 总是 5 小时。"
+          },
+          "reset_cards": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "available_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              }
+            },
+            "required": [
+              "available_count"
+            ],
+            "description": "真实重置卡库存。缺失或 null 表示未知，不得通过突发重置次数推算；原始 usage.rateLimitResetCredits 也受支持。"
           }
         },
         "oneOf": [
@@ -248,11 +265,22 @@
         "summary": "查看各账号最近采样的额度耗尽趋势估计",
         "description": "仅用同一额度周期内连续且新鲜的采样计算。数据不足、采样过期或跨重置时不预测；估计不代表平台承诺。",
         "parameters": [
-          {"name": "account", "in": "query", "required": false, "schema": {"type": "string"}}
+          {
+            "name": "account",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": {"description": "按账号分组的各额度窗口预测与不预测原因"},
-          "401": {"description": "需要登录或访问密钥"}
+          "200": {
+            "description": "按账号分组的各额度窗口预测与不预测原因"
+          },
+          "401": {
+            "description": "需要登录或访问密钥"
+          }
         }
       }
     },
@@ -376,8 +404,12 @@
         "summary": "Read cached Tibo public post text",
         "description": "Returns the server's text-only RSS cache, source and fetch time. Posts are untrusted external content and do not confirm quota resets. Requires a browser session or read/upload bearer token.",
         "responses": {
-          "200": {"description": "Cached posts and fetch status"},
-          "401": {"description": "Not authenticated"}
+          "200": {
+            "description": "Cached posts and fetch status"
+          },
+          "401": {
+            "description": "Not authenticated"
+          }
         }
       }
     },

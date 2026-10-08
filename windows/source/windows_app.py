@@ -459,6 +459,8 @@ class CollectorApp:
     def render_snapshot(self,snapshot):
         windows=snapshot['reports'].get('usage',{}).get('windows',[])
         lines=['账号：'+snapshot['account']]
+        cards=snapshot['reports'].get('usage',{}).get('reset_cards')
+        lines.append('重置卡：'+(str(cards['available_count'])+' 张' if cards is not None else '未返回（需新版采集器及接口支持）'))
         for minutes,target in ((300,self.five_hour),(10080,self.weekly)):
             window=next((w for w in windows if w['window_minutes']==minutes),None)
             target.set(f"{100-window['used_percent']:g}%" if window else '未返回')

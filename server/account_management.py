@@ -131,6 +131,10 @@ def register_account_management(app, db, browser_authenticated, browser_write):
                 return '分析日统计单位'
         checks = (
             ("""SELECT 1 FROM reports a JOIN reports b ON b.account=?
+                AND b.observed_at=a.observed_at WHERE a.account=?
+                AND a.reset_card_count IS NOT NULL AND b.reset_card_count IS NOT NULL
+                AND a.reset_card_count!=b.reset_card_count LIMIT 1""", '同一采样时间的重置卡数量'),
+            ("""SELECT 1 FROM reports a JOIN reports b ON b.account=?
                 AND b.report_key=a.report_key WHERE a.account=? LIMIT 1""", '上报 ID'),
             ("""SELECT 1 FROM samples a JOIN samples b ON b.account=?
                 AND b.window_id=a.window_id AND b.observed_at=a.observed_at

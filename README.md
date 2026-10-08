@@ -7,7 +7,7 @@
 | 目录 | 内容 |
 | --- | --- |
 | `server/` | Flask + SQLite 网页服务、Docker Compose、Nginx 示例及测试 |
-| `windows/` | Windows 采集器 v1.2.1 可执行程序、使用说明和第三方许可 |
+| `windows/` | Windows 采集器 v1.3.0 可执行程序、使用说明和第三方许可 |
 | `windows/source/` | 共享 Tkinter 客户端源码、Windows 构建脚本和测试 |
 | `macos/` | macOS 菜单栏 / 钥匙串适配及 App 打包工具（待 Mac 实机验证） |
 
@@ -42,7 +42,7 @@ sudo bash deploy.sh
 - 默认设置和本机数据在 `%LOCALAPPDATA%/CodexUsageCollector`，与程序目录分开。
 - 重启程序后点击「开始自动」启用定时运行。
 
-[Windows 详细说明](windows/README.md)。内含的 EXE 是 v1.2.1，可用 `windows/SHA256.txt` 校验。
+[Windows 详细说明](windows/README.md)。内含的 EXE 是 v1.3.0，可用 `windows/SHA256.txt` 校验。
 
 从源码运行或重新构建（Windows，Python 3.12）：
 

@@ -17,6 +17,25 @@ RAW={'rate_limit':{'primary_window':{'used_percent':84,'limit_window_seconds':60
 TOKEN={'access_token':'secret-openai-token','account_id':'account-A'}
 
 class CoreTests(unittest.TestCase):
+    def test_reset_card_count_from_real_usage_shape(self):
+        raw=copy.deepcopy(RAW)
+        raw['rate_limit_reset_credits']={'available_count':3,'applicable_available_count':0}
+        report,notes=c.convert_quota(raw,'personal',NOW)
+        self.assertEqual(report['reset_cards'],{'available_count':3})
+        self.assertFalse(notes)
+        self.assertNotIn('reset_cards',c.convert_quota(RAW,'personal',NOW)[0])
+        raw['rate_limit_reset_credits']=None
+        self.assertIsNone(c.convert_quota(raw,'personal',NOW)[0]['reset_cards'])
+
+    def test_invalid_reset_cards_do_not_drop_quota(self):
+        for value in [True,-1,1.2,'3',None]:
+            raw=copy.deepcopy(RAW)
+            raw['rate_limit_reset_credits']={'available_count':value}
+            report,notes=c.convert_quota(raw,'personal',NOW)
+            self.assertIsNone(report['reset_cards'])
+            self.assertTrue(report['windows'])
+            self.assertEqual(len(notes),1)
+
     def test_weekly_primary_not_mislabelled(self):
         report,notes=c.convert_quota(RAW,'personal',NOW)
         self.assertEqual(report['windows'][0]['id'],'codex:10080')
